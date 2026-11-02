@@ -29,7 +29,7 @@ app.appendChild(canvas);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality === 'high', powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, settings.quality === 'high' ? 2 : 1));
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -147,7 +147,10 @@ window.addEventListener('keydown', e => {
     case 'KeyG':
       if (p.hasBomb && p.alive) game.dropBomb(p);
       break;
-    case 'Escape': if (dragLook) pause(); break;
+    case 'Escape':
+      if (document.pointerLockElement) document.exitPointerLock();
+      pause();
+      break;
   }
 });
 window.addEventListener('keyup', e => { keys.delete(e.code); if (e.code === 'Tab') showScores = false; });
