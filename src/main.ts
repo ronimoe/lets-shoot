@@ -25,6 +25,8 @@ const SIM_SPEED = Number(params.get('speed') ?? (AUTOTEST ? 1 : 1));
 const app = document.getElementById('app')!;
 const canvas = document.createElement('canvas');
 canvas.id = 'view';
+canvas.setAttribute('role', 'application');
+canvas.setAttribute('aria-label', 'Game view — click to aim');
 app.appendChild(canvas);
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: settings.quality === 'high', powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, settings.quality === 'high' ? 2 : 1));
@@ -62,7 +64,9 @@ audio.volume = settings.volume;
 
 // ---------------- input ----------------
 const keys = new Set<string>();
-const mouse = { left: false, right: false };
+const tapped = new Set<string>(); // keys pressed since the last tick (catches taps shorter than a tick)
+// leftTap latches a press until a sim tick has seen it, so clicks shorter than one tick still fire
+const mouse = { left: false, right: false, leftTap: false, rightTap: false };
 let locked = false;
 let dragLook = false; // fallback when pointer lock is unavailable
 let lookYaw = 0, lookPitch = 0;
@@ -100,8 +104,8 @@ canvas.addEventListener('mousedown', e => {
   if (state !== 'playing') return;
   if (hud.buyOpen && game) { hud.toggleBuy(game, false); requestLock(); return; }
   if (!locked && !dragLook) { requestLock(); return; }
-  if (e.button === 0) mouse.left = true;
-  if (e.button === 2) mouse.right = true;
+  if (e.button === 0) { mouse.left = true; mouse.leftTap = true; }
+  if (e.button === 2) { mouse.right = true; mouse.rightTap = true; }
   if (game?.local && !game.local.alive && e.button === 0) spectateIdx++;
 });
 window.addEventListener('mouseup', e => { if (e.button === 0) mouse.left = false; if (e.button === 2) mouse.right = false; });
@@ -120,6 +124,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Tab') e.preventDefault();
   if (state === 'playing' && ['Space', 'KeyW', 'KeyS', 'KeyA', 'KeyD', 'KeyC'].includes(e.code)) e.preventDefault();
   keys.add(e.code);
+  if (!e.repeat) tapped.add(e.code);
   if (state !== 'playing' || !game) {
     if (e.code === 'Escape' && state === 'paused') resume(false);
     return;
@@ -164,17 +169,20 @@ hud.onBuy = doBuy;
 
 function readInput(): Input {
   const i = emptyInput();
-  if (hud.buyOpen) return i;
+  if (hud.buyOpen) { tapped.clear(); mouse.leftTap = mouse.rightTap = false; return i; }
   i.fwd = (keys.has('KeyW') ? 1 : 0) - (keys.has('KeyS') ? 1 : 0);
   i.side = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
-  i.jump = keys.has('Space');
+  const k = (c: string) => keys.has(c) || tapped.has(c);
+  i.jump = k('Space');
   // C only: Ctrl+W (crouch-walk) is a reserved browser shortcut that closes the tab on Windows/Linux
   i.crouch = keys.has('KeyC');
   i.walk = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  i.fire = mouse.left && (locked || dragLook);
-  i.alt = mouse.right;
-  i.reload = keys.has('KeyR');
-  i.use = keys.has('KeyE');
+  i.fire = (mouse.left || mouse.leftTap) && (locked || dragLook);
+  i.alt = mouse.right || mouse.rightTap;
+  mouse.leftTap = mouse.rightTap = false;
+  i.reload = k('KeyR');
+  i.use = k('KeyE');
+  tapped.clear();
   return i;
 }
 
