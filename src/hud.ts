@@ -206,6 +206,7 @@ export class Hud {
       if (this.buyOpen) this.renderBuy(game);
     }
     e.money.classList.toggle('hidden', !me);
+    e.buyhint.classList.toggle('hidden', !me);
     e.bombicon.classList.toggle('hidden', !(me && me.alive && me.hasBomb));
 
     // crosshair
